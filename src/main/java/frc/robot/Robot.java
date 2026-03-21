@@ -4,7 +4,11 @@
 
 package frc.robot;
 
+import com.ctre.phoenix6.HootAutoReplay;
+
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
@@ -17,20 +21,12 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj.Joystick;
 
 
-  
-
-/**
- * The methods in this class are called automatically corresponding to each mode, as described in
- * the TimedRobot documentation. If you change the name of this class or the package after creating
- * this project, you must also update the Main.java file in the project.
- */
 public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+    private Command m_autonomousCommand;
 
-  //constants
+    private final RobotContainer m_robotContainer;
+
+      //constants
   public static final int MOTOR_FRONT_LEFT_STEER_ID = 1;
   public static final int MOTOR_FRONT_LEFT_DRIVE_ID = 2;
   public static final int MOTOR_FRONT_RIGHT_STEER_ID = 3;
@@ -58,19 +54,18 @@ public class Robot extends TimedRobot {
 
   public static final double MOTOR_INTAKE_PIVOT_DEFAULT_SPEED = 0.2;
   public static final double MOTOR_INTAKE_SPIN_DEFAULT_SPEED = 0.2;
-  public static final double MOTOR_FEED_DEFAULT_SPEED = 0.2;
-  public static final double MOTOR_COLUMN_DEFAULT_SPEED = 0.2;
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_LOW = 0.2;
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = 0.4;
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = 0.7;
-  public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = 0;//set to value
-  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.2;//set to value
-
+  public static final double MOTOR_FEED_DEFAULT_SPEED = 0.50;
+  public static final double MOTOR_COLUMN_DEFAULT_SPEED = -0.50;
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_LOW = -0.75; 
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.85; 
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = -1;
+  public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = -0.1; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
+  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.1; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
 
   public static final double CALIBRATION_INCREMENT = 0.01;
   public double Calibration = 0;
   public double ShooterSpeed = 0;
-  
+  public double IntakeSpeed = 0; 
 
 
   TalonFX MotorFeed = new TalonFX(MOTOR_FEEDER_ID);  
@@ -81,70 +76,57 @@ public class Robot extends TimedRobot {
   TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID);  
 
 
-  private final XboxController mControllerShooter = new XboxController(0);
-  private final XboxController mControllerDriver = new XboxController(1);
-  
-  /**
-   * This function is run when the robot is first started up and should be used for any
-   * initialization code.
-   */
-  public Robot() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
-  }
+  private final XboxController mControllerShooter = new XboxController(1);
+    /* log and replay timestamp and joystick data */
+    private final HootAutoReplay m_timeAndJoystickReplay = new HootAutoReplay()
+        .withTimestampReplay()
+        .withJoystickReplay();
 
-  /**
-   * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
-   * that you want ran during disabled, autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before LiveWindow and
-   * SmartDashboard integrated updating.
-   */
-  @Override
-  public void robotPeriodic() {}
-
-  /**
-   * This autonomous (along with the chooser code above) shows how to select between different
-   * autonomous modes using the dashboard. The sendable chooser code works with the Java
-   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the chooser code and
-   * uncomment the getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to the switch structure
-   * below with additional strings. If using the SendableChooser make sure to add them to the
-   * chooser code above as well.
-   */
-  @Override
-  public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
-
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
+    public Robot() {
+        m_robotContainer = new RobotContainer();
     }
-  }
 
-  /** This function is called once when teleop is enabled. */
-  @Override
-  public void teleopInit() {
-    //shooterMotor.set(.5); //Agnitti added 3. .5 is 50% power
-  }
+    @Override
+    public void robotPeriodic() {
+        m_timeAndJoystickReplay.update();
+        CommandScheduler.getInstance().run(); 
+    }
+
+    @Override
+    public void disabledInit() {}
+
+    @Override
+    public void disabledPeriodic() {}
+
+    @Override
+    public void disabledExit() {}
+
+    @Override
+    public void autonomousInit() {
+        m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+
+        if (m_autonomousCommand != null) {
+            CommandScheduler.getInstance().schedule(m_autonomousCommand);
+        }
+    }
+
+    @Override
+    public void autonomousPeriodic() {}
+
+    @Override
+    public void autonomousExit() {}
+
+    @Override
+    public void teleopInit() {
+        if (m_autonomousCommand != null) {
+            CommandScheduler.getInstance().cancel(m_autonomousCommand);
+        }
+        
+    }
   boolean isIntakeMotorOn = false;
-  /** This function is called periodically during operator control. */
-  @Override
-  public void teleopPeriodic() {
-    if (mControllerShooter.getLeftBumperButton()) {
+    @Override
+    public void teleopPeriodic() {
+        if (mControllerShooter.getLeftBumperButton()) {
       Calibration-=CALIBRATION_INCREMENT;
       System.out.println("-Calibration: " + Calibration);
     }
@@ -152,49 +134,34 @@ public class Robot extends TimedRobot {
       Calibration+=CALIBRATION_INCREMENT;
       System.out.println("+Calibration: " + Calibration);
     }
-    
-    if (mControllerShooter.getLeftTriggerAxis()>0.5) {//set pivot position to DOWN position
+        /*if (mControllerShooter.getLeftTriggerAxis()>0.5) {//set pivot position to DOWN position
       //Get Pivot to DOWN position
-     
+  
       MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_DOWN_POSITION+Calibration);
       StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition();
       Angle currentRotations = positionSignal.refresh().getValue();
-      System.out.println("DOWN Motor Position: " + currentRotations + " rotations");
-    }
-
-    if (mControllerShooter.getRightTriggerAxis()>0.5) {//set pivot position to UP position
+      System.out.println("DOWN Motor Position: " + currentRotations + " rotations"); */
+  {
+    
+    /*if (mControllerShooter.getRightTriggerAxis()>0.5) {//set pivot position to UP position
       //Get Pivot to UP position
       MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_UP_POSITION+Calibration);
       StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition();
       Angle currentRotations = positionSignal.refresh().getValue();
-      System.out.println("UP Motor Position: " + currentRotations + " rotations");
-    }
-
-    
-    
-     
-  
-    /*
-    if (mControllerShooter.getXButton()) {// it works
-      MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED+Calibration);
-      System.out.println("MotorColumn: "+ MOTOR_COLUMN_DEFAULT_SPEED + Calibration);
+      System.out.println("UP Motor Position: " + currentRotations + " rotations"); */
     } 
-    else {
-      MotorColumn.set(0);
-    }
-      */
-    if (mControllerShooter.getRawButtonReleased(7)){
+        if (mControllerShooter.getRawButtonReleased(7)){
       isIntakeMotorOn = !isIntakeMotorOn;
       System.out.println("Intake Motor Toggled: " + isIntakeMotorOn);
     }
-    
+        
     if (isIntakeMotorOn) { 
       MotorIntakeSpin.set(MOTOR_INTAKE_SPIN_DEFAULT_SPEED+Calibration);
     }
     else {
       MotorIntakeSpin.set(0);
     }
-
+    
     if (mControllerShooter.getPOV()==DPAD_UP) { 
       System.out.println("DPADUP, turn on FEED Motor");
       MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration);
@@ -202,7 +169,7 @@ public class Robot extends TimedRobot {
     else {
       MotorFeed.set(0);
     }
-
+    
     if (mControllerShooter.getPOV()==DPAD_DOWN) { 
       System.out.println("DPAD DOWN, turn off FEED Motor");
       MotorFeed.set(0);
@@ -225,55 +192,73 @@ public class Robot extends TimedRobot {
       ShooterSpeed=0;
       MotorIntakeSpin.set(ShooterSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
+      MotorShooterLeft.set(ShooterSpeed);
+      MotorShooterRight.set(ShooterSpeed);
+      MotorColumn.set(ShooterSpeed);
     }
+
    
     if (mControllerShooter.getXButton()) {// set Shooter Speed to low
-      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_LOW+Calibration;
+      
+      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_LOW-Calibration; //Calibration is negative because we set the shooter speed for low as negative
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
-
-    }
-     if (mControllerShooter.getBButton()) {// set Shooter Speed to Medium
-      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM+Calibration;
-      MotorShooterLeft.set(ShooterSpeed);
-      MotorShooterRight.set(ShooterSpeed);
-      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
-    }
-     if (mControllerShooter.getYButton()) {// set Shooter Speed to High
-      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_HIGH+Calibration;
-      MotorShooterLeft.set(ShooterSpeed);
-      MotorShooterRight.set(ShooterSpeed);
-      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
+      MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
+      MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
     } 
 
+
+     if (mControllerShooter.getBButton()) {// set Shooter Speed to Medium
+      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM-Calibration;
+      MotorShooterLeft.set(ShooterSpeed);
+      MotorShooterRight.set(ShooterSpeed);
+      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
+      MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
+      MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
     }
-  
-  
+     if (mControllerShooter.getYButton()) {// set Shooter Speed to High
+      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_HIGH-Calibration;
+      MotorShooterLeft.set(ShooterSpeed);
+      MotorShooterRight.set(ShooterSpeed);
+      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
+      MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
+      MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
+    }
+    if (mControllerShooter.getLeftTriggerAxis()>0.1) {//set pivot position to DOWN position
+      IntakeSpeed=MOTOR_INTAKE_PIVOT_DOWN_POSITION-Calibration; 
+      
+      MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_DOWN_POSITION+Calibration);
+      StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition();
+      Angle currentRotations = positionSignal.refresh().getValue();
+      System.out.println("DOWN Motor Position: " + currentRotations); // added "+ currentRotations" to print the actual position of the motor in rotations
+    }
 
+    if (mControllerShooter.getRightTriggerAxis()>0.1) {//set pivot position to UP position
+      IntakeSpeed=MOTOR_INTAKE_PIVOT_UP_POSITION-Calibration;
+      
+      MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_UP_POSITION+Calibration); 
+      StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition(); 
+      Angle currentRotations = positionSignal.refresh().getValue();
+      System.out.println("UP Motor Position: " + currentRotations); 
+    }
+      
+  }
 
-  /** This function is called once when the robot is disabled. */
-  @Override
-  public void disabledInit() {}
+    @Override
+    public void teleopExit() {}
 
-  /** This function is called periodically when disabled. */
-  @Override
-  public void disabledPeriodic() {}
+    @Override
+    public void testInit() {
+        CommandScheduler.getInstance().cancelAll();
+    }
 
-  /** This function is called once when test mode is enabled. */
-  @Override
-  public void testInit() {}
+    @Override
+    public void testPeriodic() {}
 
-  /** This function is called periodically during test mode. */
-  @Override
-  public void testPeriodic() {}
+    @Override
+    public void testExit() {}
 
-  /** This function is called once when the robot is first started up. */
-  @Override
-  public void simulationInit() {}
-
-  /** This function is called periodically whilst in simulation. */
-  @Override
-  public void simulationPeriodic() {}  
-
+    @Override
+    public void simulationPeriodic() {}
 }
