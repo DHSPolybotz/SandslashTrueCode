@@ -73,7 +73,9 @@ public class Robot extends TimedRobot {
   TalonFX MotorIntakePivot = new TalonFX(MOTOR_INTAKE_PIVOT_ID); 
   TalonFX MotorIntakeSpin = new TalonFX(MOTOR_INTAKE_COLLECT_ID); 
   TalonFX MotorShooterLeft = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_LEFT_ID);  
-  TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID);  
+  TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID); 
+  //TalonFX MotorIntakeDown = new TalonFX(MOTOR_INTAKE_PIVOT_DOWN_ID); 
+  //TalonFX MotorIntakeUp = new TalonFX(MOTOR_INTAKE_PIVOT_UP_ID);
 
 
   private final XboxController mControllerShooter = new XboxController(1);
