@@ -6,6 +6,7 @@ package frc.robot;
 
 import com.ctre.phoenix6.HootAutoReplay;
 
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -14,11 +15,18 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.hardware.TalonFX;  
+import com.ctre.phoenix6.configs.TalonFXConfiguration; //motion magic
+import com.ctre.phoenix6.configs.FeedbackConfigs;
+import com.ctre.phoenix6.configs.MotionMagicConfigs; //motion magic
+import com.ctre.phoenix6.controls.MotionMagicVoltage; //motion magic
+import com.ctre.phoenix6.controls.MotionMagicDutyCycle; //motion magic
+import com.ctre.phoenix6.configs.Slot0Configs;
 
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.motorcontrol.Talon;
 import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.wpilibj.Joystick;
+import java.time.Instant;
+//import edu.wpi.first.wpilibj.Joystick; //Not used. Using Xbox instead
 
 
 public class Robot extends TimedRobot {
@@ -60,13 +68,22 @@ public class Robot extends TimedRobot {
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.85; 
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = -1;
   public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = -0.1; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
-  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.1; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
+  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 5; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
+  public static final double MOTOR_INTAKE_PIVOT_SPEED_HACK = 0.1;
 
+  public static final boolean IS_CALIBRATING = false; // Set to TRUE if calibrating constants.
+
+  //=======================================================================================================
+  //The HACK code should be removed if the Pivot SetPosition code works.
+  public static final boolean IS_USING_PIVOT_HACK = false; // Set to TRUE if using Pivot Motor Hack.
+  // End of Pivot Hack section==============================================================================
+ 
   public static final double CALIBRATION_INCREMENT = 0.01;
   public double Calibration = 0;
   public double ShooterSpeed = 0;
   public double IntakeSpeed = 0; 
-
+  public double FeedSpeed = 0;
+  public double ColumnSpeed = 0;
 
   TalonFX MotorFeed = new TalonFX(MOTOR_FEEDER_ID);  
   TalonFX MotorColumn = new TalonFX(MOTOR_COLUMN_ID); 
@@ -74,8 +91,23 @@ public class Robot extends TimedRobot {
   TalonFX MotorIntakeSpin = new TalonFX(MOTOR_INTAKE_COLLECT_ID); 
   TalonFX MotorShooterLeft = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_LEFT_ID);  
   TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID); 
-  //TalonFX MotorIntakeDown = new TalonFX(MOTOR_INTAKE_PIVOT_DOWN_ID); 
-  //TalonFX MotorIntakeUp = new TalonFX(MOTOR_INTAKE_PIVOT_UP_ID);
+  
+  // MOTION MAGIC BEGINS--------------------------------------------
+  TalonFXConfiguration talonFXConfigs = new TalonFXConfiguration()
+                                            .withMotionMagic(new MotionMagicConfigs()
+                                              .withMotionMagicCruiseVelocity(Units.degreesToRotations(45))
+                                              .withMotionMagicAcceleration(Units.degreesToRotations(45)))
+                                            .withSlot0(new Slot0Configs()
+                                              .withKP(10)
+                                              .withKI(0)
+                                              .withKD(0.1)
+                                              .withKS(0.1))
+                                            .withFeedback(new FeedbackConfigs()
+                                              .withSensorToMechanismRatio(15));
+
+  //MotorIntakePivot.getConfigurator().apply(talonFXConfigs);
+  
+// MOTION MAGIC ENDS--------------------------------------------
 
 
   private final XboxController mControllerShooter = new XboxController(1);
@@ -86,6 +118,18 @@ public class Robot extends TimedRobot {
 
     public Robot() {
         m_robotContainer = new RobotContainer();
+
+        TalonFXConfiguration config = new TalonFXConfiguration(); 
+    // PID (We might need to tune these values later, but for now we keep kP to 3 and leave kI and kD at 0)
+    config.Slot0.kP = 3; //How strong the motor will try to reach the target position. Lower values will make motor less aggressive.
+    config.Slot0.kI = 0; //If the motor stops short of the target position, kI will use a small amount of power to slowly move it the rest of the way.
+    config.Slot0.kD = 0; //Slows the motor down as it gets closer to the target position. Higher values will make the motor slow down more as it approaches the target position.
+
+    // Motion Magic settings 
+    config.MotionMagic.MotionMagicCruiseVelocity = 5; //Maximum speed the motor can move at when trying to reach the target position.
+    config.MotionMagic.MotionMagicAcceleration = 10; //Acceleration of the motor when trying to reach the target position.
+
+    MotorIntakePivot.getConfigurator().apply(config); 
     }
 
     @Override
@@ -128,35 +172,18 @@ public class Robot extends TimedRobot {
   boolean isIntakeMotorOn = false;
     @Override
     public void teleopPeriodic() {
-        if (mControllerShooter.getLeftBumperButton()) {
+    
+    if(IS_CALIBRATING) { //If the calibration flag isn't set to TRUE, disable calibration
+      if (mControllerShooter.getLeftBumperButton()) {
       Calibration-=CALIBRATION_INCREMENT;
       System.out.println("-Calibration: " + Calibration);
+      }
+      if (mControllerShooter.getRightBumperButton()) {
+        Calibration+=CALIBRATION_INCREMENT;
+        System.out.println("+Calibration: " + Calibration);
+      }
     }
-    if (mControllerShooter.getRightBumperButton()) {
-      Calibration+=CALIBRATION_INCREMENT;
-      System.out.println("+Calibration: " + Calibration);
-    }
-        /*if (mControllerShooter.getLeftTriggerAxis()>0.5) {//set pivot position to DOWN position
-      //Get Pivot to DOWN position
-  
-      MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_DOWN_POSITION+Calibration);
-      StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition();
-      Angle currentRotations = positionSignal.refresh().getValue();
-      System.out.println("DOWN Motor Position: " + currentRotations + " rotations"); */
-  {
-    
-    /*if (mControllerShooter.getRightTriggerAxis()>0.5) {//set pivot position to UP position
-      //Get Pivot to UP position
-      MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_UP_POSITION+Calibration);
-      StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition();
-      Angle currentRotations = positionSignal.refresh().getValue();
-      System.out.println("UP Motor Position: " + currentRotations + " rotations"); */
-    } 
-        if (mControllerShooter.getRawButtonReleased(7)){
-      isIntakeMotorOn = !isIntakeMotorOn;
-      System.out.println("Intake Motor Toggled: " + isIntakeMotorOn);
-    }
-        
+      
     if (isIntakeMotorOn) { 
       MotorIntakeSpin.set(MOTOR_INTAKE_SPIN_DEFAULT_SPEED+Calibration);
     }
@@ -197,6 +224,7 @@ public class Robot extends TimedRobot {
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
       MotorColumn.set(ShooterSpeed);
+      //MotorFeed.set(FeedSpeed);
     }
 
    
@@ -208,6 +236,8 @@ public class Robot extends TimedRobot {
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
       MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
+      MotorColumn.set(ColumnSpeed);
+      //MotorFeed.set(FeedSpeed);
     } 
 
 
@@ -218,34 +248,36 @@ public class Robot extends TimedRobot {
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
       MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
+      MotorColumn.set(ColumnSpeed);
+      //MotorFeed.set(FeedSpeed);
     }
      if (mControllerShooter.getYButton()) {// set Shooter Speed to High
       ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_HIGH-Calibration;
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
+      MotorFeed.set(FeedSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
       MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
+      MotorColumn.set(ColumnSpeed);
     }
-    if (mControllerShooter.getLeftTriggerAxis()>0.1) {//set pivot position to DOWN position
-      IntakeSpeed=MOTOR_INTAKE_PIVOT_DOWN_POSITION-Calibration; 
-      
-      MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_DOWN_POSITION+Calibration);
-      StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition();
-      Angle currentRotations = positionSignal.refresh().getValue();
-      System.out.println("DOWN Motor Position: " + currentRotations); // added "+ currentRotations" to print the actual position of the motor in rotations
-    }
-
-    if (mControllerShooter.getRightTriggerAxis()>0.1) {//set pivot position to UP position
-      IntakeSpeed=MOTOR_INTAKE_PIVOT_UP_POSITION-Calibration;
-      
-      MotorIntakePivot.setPosition(MOTOR_INTAKE_PIVOT_UP_POSITION+Calibration); 
-      StatusSignal<Angle> positionSignal = MotorIntakePivot.getPosition(); 
-      Angle currentRotations = positionSignal.refresh().getValue();
-      System.out.println("UP Motor Position: " + currentRotations); 
-    }
-      
+    // DOWN 
+if (mControllerShooter.getLeftTriggerAxis() > 0.1) 
+  { //Set pivot arm to DOWN
+  if(IS_USING_PIVOT_HACK)//This code is only run if the pivot motor hack is being used
+    MotorFeed.set(-(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration));
+  else
+    MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_DOWN_POSITION + Calibration));
   }
+// UP 
+if (mControllerShooter.getRightTriggerAxis() > 0.1) 
+  { //Set pivot arm to UP
+  if(IS_USING_PIVOT_HACK) //This code is only run if the pivot motor hack is being used
+    MotorFeed.set(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration);
+  else // This code is run if not hacking the pivot motor
+    MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_UP_POSITION + Calibration) ); 
+  }
+}
 
     @Override
     public void teleopExit() {}
