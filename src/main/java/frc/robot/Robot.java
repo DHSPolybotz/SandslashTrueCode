@@ -235,8 +235,8 @@ public class Robot extends TimedRobot {
       MotorShooterRight.set(ShooterSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
-      MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
-      MotorColumn.set(ColumnSpeed);
+      MotorFeed.set(MOTOR_FEEDER_ID+Calibration); //if this doesnt work, change to "(MOTOR_FEED_DEFAULT_SPEED + Calibration);"
+      MotorColumn.set(ColumnSpeed); //Delete this if column doesnt move
       //MotorFeed.set(FeedSpeed);
     } 
 
@@ -247,8 +247,8 @@ public class Robot extends TimedRobot {
       MotorShooterRight.set(ShooterSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
-      MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
-      MotorColumn.set(ColumnSpeed);
+      MotorFeed.set(MOTOR_FEEDER_ID+Calibration); //if this doesnt work, change to "(MOTOR_FEED_DEFAULT_SPEED + Calibration);"
+      MotorColumn.set(ColumnSpeed); //Delete this if column doesnt move
       //MotorFeed.set(FeedSpeed);
     }
      if (mControllerShooter.getYButton()) {// set Shooter Speed to High
@@ -258,14 +258,14 @@ public class Robot extends TimedRobot {
       MotorFeed.set(FeedSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
-      MotorFeed.set(MOTOR_FEEDER_ID+Calibration);
-      MotorColumn.set(ColumnSpeed);
+      MotorFeed.set(MOTOR_FEEDER_ID+Calibration); //if this doesnt work, change to "(MOTOR_FEED_DEFAULT_SPEED + Calibration);" 
+      MotorColumn.set(ColumnSpeed); //Delete this if column doesnt move
     }
     // DOWN 
 if (mControllerShooter.getLeftTriggerAxis() > 0.1) 
   { //Set pivot arm to DOWN
   if(IS_USING_PIVOT_HACK)//This code is only run if the pivot motor hack is being used
-    MotorFeed.set(-(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration));
+    MotorFeed.set(-(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration)); //Change to "MotorIntakePivot.set(...)"
   else
     MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_DOWN_POSITION + Calibration));
   }
@@ -273,7 +273,7 @@ if (mControllerShooter.getLeftTriggerAxis() > 0.1)
 if (mControllerShooter.getRightTriggerAxis() > 0.1) 
   { //Set pivot arm to UP
   if(IS_USING_PIVOT_HACK) //This code is only run if the pivot motor hack is being used
-    MotorFeed.set(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration);
+    MotorFeed.set(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration); //Change to "MotorIntakePivot.set(...)"
   else // This code is run if not hacking the pivot motor
     MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_UP_POSITION + Calibration) ); 
   }
