@@ -64,12 +64,12 @@ public class Robot extends TimedRobot {
   public static final double MOTOR_INTAKE_SPIN_DEFAULT_SPEED = 0.2;
   public static final double MOTOR_FEED_DEFAULT_SPEED = 0.5;
   public static final double MOTOR_COLUMN_DEFAULT_SPEED = -0.50;
-  public static final double MOTOR_INTAKE_COLLECT_DEFAULT_SPEED = 0.2;
+  public static final double MOTOR_INTAKE_COLLECT_DEFAULT_SPEED = 1.0;
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_LOW = -0.75; 
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.85; 
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = -1;
   public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = -0.1; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
-  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.2; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
+  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.5; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor (Change height of pivot arm by changing this value)
   public static final double MOTOR_INTAKE_PIVOT_SPEED_HACK = 0.1;
 
   public static final boolean IS_CALIBRATING = false; // Set to TRUE if calibrating constants.
@@ -95,7 +95,7 @@ public class Robot extends TimedRobot {
   TalonFX MotorFeed = new TalonFX(MOTOR_FEEDER_ID);  
   TalonFX MotorColumn = new TalonFX(MOTOR_COLUMN_ID); 
   TalonFX MotorIntakePivot = new TalonFX(MOTOR_INTAKE_PIVOT_ID); 
-  TalonFX MotorIntakeSpin = new TalonFX(MOTOR_INTAKE_COLLECT_ID); 
+  TalonFX MotorIntakeCollect = new TalonFX(MOTOR_INTAKE_COLLECT_ID); 
   TalonFX MotorShooterLeft = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_LEFT_ID);  
   TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID); 
   // Drive motors (created here so autonomous can drive)
@@ -243,9 +243,9 @@ public class Robot extends TimedRobot {
     public void teleopPeriodic() {
     
       if (mControllerShooter.getLeftBumperButton()) {
-        MotorIntakeSpin.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
+        MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
       } else {
-        MotorIntakeSpin.set(0);
+        MotorIntakeCollect.set(0);
       }
         
    
@@ -263,10 +263,10 @@ public class Robot extends TimedRobot {
     
       
     if (isIntakeMotorOn) { 
-      MotorIntakeSpin.set(MOTOR_INTAKE_SPIN_DEFAULT_SPEED+Calibration);
+      MotorIntakeCollect.set(MOTOR_INTAKE_SPIN_DEFAULT_SPEED+Calibration);
     }
     else {
-      MotorIntakeSpin.set(0);
+      MotorIntakeCollect.set(0);
     }
     
     /*if (mControllerShooter.getPOV()==DPAD_UP) { 
@@ -296,7 +296,7 @@ public class Robot extends TimedRobot {
 
     if (mControllerShooter.getXButton()) {// set shooter speed to 0
       ShooterSpeed=0;
-      MotorIntakeSpin.set(ShooterSpeed);
+      MotorIntakeCollect.set(ShooterSpeed);
       System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
@@ -338,7 +338,7 @@ public class Robot extends TimedRobot {
     }
 
     // DOWN 
-if (mControllerShooter.getLeftTriggerAxis() > 0.1 && MotorIntakePivot.getPosition().getValueAsDouble() > MOTOR_INTAKE_PIVOT_DOWN_POSITION)
+if (mControllerShooter.getPOV() == DPAD_DOWN  && MotorIntakePivot.getPosition().getValueAsDouble() > MOTOR_INTAKE_PIVOT_DOWN_POSITION)
   { //Set pivot arm to DOWN
   if(IS_USING_PIVOT_HACK)//This code is only run if the pivot motor hack is being used
     MotorIntakePivot.set(-(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration)); //Changed MotorFeed.set into MotorIntakePivot.set
@@ -346,7 +346,7 @@ if (mControllerShooter.getLeftTriggerAxis() > 0.1 && MotorIntakePivot.getPositio
     MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_DOWN_POSITION + Calibration));
   }
 // UP 
-if (mControllerShooter.getRightTriggerAxis() > 0.1 && MotorIntakePivot.getPosition().getValueAsDouble() < MOTOR_INTAKE_PIVOT_UP_POSITION) //Should allow the 
+if (mControllerShooter.getPOV() == DPAD_UP && MotorIntakePivot.getPosition().getValueAsDouble() < MOTOR_INTAKE_PIVOT_UP_POSITION) //Should allow the 
   { //Set pivot arm to UP
   if(IS_USING_PIVOT_HACK) //This code is only run if the pivot motor hack is being used
     MotorIntakePivot.set(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration); //Changed MotorFeed.set into MotorIntakePivot.set
