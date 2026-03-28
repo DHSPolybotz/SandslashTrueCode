@@ -14,7 +14,8 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import com.ctre.phoenix6.StatusSignal;
-import com.ctre.phoenix6.hardware.TalonFX;  
+import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.configs.TalonFXConfiguration; //motion magic
 import com.ctre.phoenix6.configs.FeedbackConfigs;
 import com.ctre.phoenix6.configs.MotionMagicConfigs; //motion magic
@@ -28,13 +29,14 @@ import edu.wpi.first.units.measure.Angle;
 import java.time.Instant;
 //import edu.wpi.first.wpilibj.Joystick; //Not used. Using Xbox instead
 
-
 public class Robot extends TimedRobot {
-    private Command m_autonomousCommand;
+  private Command m_autonomousCommand;
 
-    private final RobotContainer m_robotContainer;
+  private boolean pivotUp = true;
 
-      //constants
+  private final RobotContainer m_robotContainer;
+
+  // constants
   public static final int MOTOR_FRONT_LEFT_STEER_ID = 1;
   public static final int MOTOR_FRONT_LEFT_DRIVE_ID = 2;
   public static final int MOTOR_FRONT_RIGHT_STEER_ID = 3;
@@ -65,310 +67,364 @@ public class Robot extends TimedRobot {
   public static final double MOTOR_FEED_DEFAULT_SPEED = 0.5;
   public static final double MOTOR_COLUMN_DEFAULT_SPEED = -0.50;
   public static final double MOTOR_INTAKE_COLLECT_DEFAULT_SPEED = 1.0;
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_LOW = -0.75; 
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.85; 
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_LOW = -0.75;
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.85;
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = -1;
-  public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = -0.1; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor
-  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.5; // 0.05 rotations, multiplied by 25 to convert to real rotation of motor (Change height of pivot arm by changing this value)
+  public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = -0.1; // 0.05 rotations, multiplied by 25 to convert to
+                                                                      // real rotation of motor
+  public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.5; // 0.05 rotations, multiplied by 25 to convert to
+                                                                   // real rotation of motor (Change height of pivot arm
+                                                                   // by changing this value)
   public static final double MOTOR_INTAKE_PIVOT_SPEED_HACK = 0.1;
+  public static final double MOTOR_INTAKE_PIVOT_DOWN_SPEED = -0.5;
+  public static final double MOTOR_INTAKE_PIVOT_DOWN_MAINTENANCE_SPEED = 0;
+  public static final double MOTOR_INTAKE_PIVOT_UP_SPEED = 0.3;
+  public static final double MOTOR_INTAKE_PIVOT_UP_MAINTENANCE_SPEED  = 0;
 
   public static final boolean IS_CALIBRATING = false; // Set to TRUE if calibrating constants.
-  
 
-  //=======================================================================================================
-  //The HACK code should be removed if the Pivot SetPosition code works.
+  // =======================================================================================================
+  // The HACK code should be removed if the Pivot SetPosition code works.
   public static final boolean IS_USING_PIVOT_HACK = false; // Set to TRUE if using Pivot Motor Hack.
-  // End of Pivot Hack section==============================================================================
- 
+  // End of Pivot Hack
+  // section==============================================================================
+
   public static final double CALIBRATION_INCREMENT = 0.01;
   public double Calibration = 0;
   public double ShooterSpeed = 0;
-  public double IntakeSpeed = 0; 
+  public double IntakeSpeed = 0;
   public double FeedSpeed = 0;
   public double ColumnSpeed = 0;
 
-  // Teleop feed/column pulse state (press B to pulse feed/column; hold B to run shooter)
+  // Teleop feed/column pulse state (press B to pulse feed/column; hold B to run
+  // shooter)
   private boolean previousB = false;
   private long feedEndTimeMs = 0;
   private static final long FEED_PULSE_MS = 3000; // ms to run feed/column on B-press
 
-  TalonFX MotorFeed = new TalonFX(MOTOR_FEEDER_ID);  
-  TalonFX MotorColumn = new TalonFX(MOTOR_COLUMN_ID); 
-  TalonFX MotorIntakePivot = new TalonFX(MOTOR_INTAKE_PIVOT_ID); 
-  TalonFX MotorIntakeCollect = new TalonFX(MOTOR_INTAKE_COLLECT_ID); 
-  TalonFX MotorShooterLeft = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_LEFT_ID);  
-  TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID); 
+  TalonFX MotorFeed = new TalonFX(MOTOR_FEEDER_ID);
+  TalonFX MotorColumn = new TalonFX(MOTOR_COLUMN_ID);
+  TalonFX MotorIntakePivot = new TalonFX(MOTOR_INTAKE_PIVOT_ID);
+  TalonFX MotorIntakeCollect = new TalonFX(MOTOR_INTAKE_COLLECT_ID);
+  TalonFX MotorShooterLeft = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_LEFT_ID);
+  TalonFX MotorShooterRight = new TalonFX(MOTOR_SHOOTER_FLYWHEEL_RIGHT_ID);
   // Drive motors (created here so autonomous can drive)
   TalonFX DriveFrontLeft = new TalonFX(MOTOR_FRONT_LEFT_DRIVE_ID);
   TalonFX DriveFrontRight = new TalonFX(MOTOR_FRONT_RIGHT_DRIVE_ID);
   TalonFX DriveBackLeft = new TalonFX(MOTOR_BACK_LEFT_DRIVE_ID);
   TalonFX DriveBackRight = new TalonFX(MOTOR_BACK_RIGHT_DRIVE_ID);
-  
-  //MotorColumn.follow(MotorFeed);
+
+  // MotorColumn.follow(MotorFeed);
   // MOTION MAGIC BEGINS--------------------------------------------
   TalonFXConfiguration talonFXConfigs = new TalonFXConfiguration()
-                                            .withMotionMagic(new MotionMagicConfigs()
-                                              .withMotionMagicCruiseVelocity(Units.degreesToRotations(45))
-                                              .withMotionMagicAcceleration(Units.degreesToRotations(45)))
-                                            .withSlot0(new Slot0Configs()
-                                              .withKP(10)
-                                              .withKI(0)
-                                              .withKD(0.1)
-                                              .withKS(0.1))
-                                            .withFeedback(new FeedbackConfigs()
-                                              .withSensorToMechanismRatio(15));
+      .withMotionMagic(new MotionMagicConfigs()
+          .withMotionMagicCruiseVelocity(Units.degreesToRotations(45))
+          .withMotionMagicAcceleration(Units.degreesToRotations(45)))
+      .withSlot0(new Slot0Configs()
+          .withKP(10)
+          .withKI(0)
+          .withKD(0.1)
+          .withKS(0.1))
+      .withFeedback(new FeedbackConfigs()
+          .withSensorToMechanismRatio(15));
 
-  //MotorIntakePivot.getConfigurator().apply(talonFXConfigs);
-  
-// MOTION MAGIC ENDS--------------------------------------------
+  // MotorIntakePivot.getConfigurator().apply(talonFXConfigs);
 
+  // MOTION MAGIC ENDS--------------------------------------------
 
   private final XboxController mControllerShooter = new XboxController(1);
-    /* log and replay timestamp and joystick data */
-    private final HootAutoReplay m_timeAndJoystickReplay = new HootAutoReplay()
-        .withTimestampReplay()
-        .withJoystickReplay();
+  /* log and replay timestamp and joystick data */
+  private final HootAutoReplay m_timeAndJoystickReplay = new HootAutoReplay()
+      .withTimestampReplay()
+      .withJoystickReplay();
 
-    public Robot() {
-        m_robotContainer = new RobotContainer();
+  public Robot() {
+    m_robotContainer = new RobotContainer();
 
-        TalonFXConfiguration config = new TalonFXConfiguration(); 
-    // PID (We might need to tune these values later, but for now we keep kP to 3 and leave kI and kD at 0)
-    config.Slot0.kP = 3; //How strong the motor will try to reach the target position. Lower values will make motor less aggressive.
-    config.Slot0.kI = 0; //If the motor stops short of the target position, kI will use a small amount of power to slowly move it the rest of the way.
-    config.Slot0.kD = 0; //Slows the motor down as it gets closer to the target position. Higher values will make the motor slow down more as it approaches the target position.
+    TalonFXConfiguration config = new TalonFXConfiguration();
+    // PID (We might need to tune these values later, but for now we keep kP to 3
+    // and leave kI and kD at 0)
+    config.Slot0.kP = 3; // How strong the motor will try to reach the target position. Lower values will
+                         // make motor less aggressive.
+    config.Slot0.kI = 0; // If the motor stops short of the target position, kI will use a small amount
+                         // of power to slowly move it the rest of the way.
+    config.Slot0.kD = 0; // Slows the motor down as it gets closer to the target position. Higher values
+                         // will make the motor slow down more as it approaches the target position.
 
-    // Motion Magic settings 
-    config.MotionMagic.MotionMagicCruiseVelocity = 5; //Maximum speed the motor can move at when trying to reach the target position.
-    config.MotionMagic.MotionMagicAcceleration = 10; //Acceleration of the motor when trying to reach the target position.
+    // Motion Magic settings
+    config.MotionMagic.MotionMagicCruiseVelocity = 5; // Maximum speed the motor can move at when trying to reach the
+                                                      // target position.
+    config.MotionMagic.MotionMagicAcceleration = 10; // Acceleration of the motor when trying to reach the target
+                                                     // position.
 
-    MotorIntakePivot.getConfigurator().apply(config); 
-    }
+    MotorIntakePivot.getConfigurator().apply(config);
+    MotorIntakePivot.setNeutralMode(NeutralModeValue.Brake);
+  }
 
-    @Override
-    public void robotPeriodic() {
-        m_timeAndJoystickReplay.update();
-        CommandScheduler.getInstance().run(); 
-    }
+  @Override
+  public void robotPeriodic() {
+    m_timeAndJoystickReplay.update();
+    CommandScheduler.getInstance().run();
+  }
 
-    @Override
-    public void disabledInit() {}
+  @Override
+  public void disabledInit() {
+  }
 
-    @Override
-    public void disabledPeriodic() {}
+  @Override
+  public void disabledPeriodic() {
+  }
 
-    @Override
-    public void disabledExit() {}
+  @Override
+  public void disabledExit() {
+  }
 
-    @Override
-    public void autonomousInit() { //Autonomous code
+  @Override
+  public void autonomousInit() { // Autonomous code
     // We'll run a small time-based autonomous here: drive ~2m backward, then shoot.
-      /*m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+    /*
+     * m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+     * 
+     * final double distanceMeters = 2.0; // desired backward travel
+     * final double percentOutput = -0.5; // negative => backward
+     * final double assumedMaxSpeedMps = 3.0; // estimate of robot speed at 100%
+     * output (adjust if needed)
+     * final double actualSpeedMps = assumedMaxSpeedMps * Math.abs(percentOutput);
+     * final long driveTimeMs = (long) (1000.0 * (distanceMeters /
+     * Math.max(actualSpeedMps, 0.01)));
+     * 
+     * // Shooting parameters
+     * final double shooterOutput = MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM; // use
+     * medium speed
+     * final double feedOutput = MOTOR_FEED_DEFAULT_SPEED;
+     * final double columnOutput = MOTOR_COLUMN_DEFAULT_SPEED;
+     * final long shootTimeMs = 3000; // shoot for 3s
+     * 
+     * Thread autoThread = new Thread(() -> {
+     * try {
+     * System.out.println("Autonomous: driving backward for ~" + driveTimeMs +
+     * " ms");
+     * DriveFrontLeft.set(percentOutput);
+     * DriveFrontRight.set(percentOutput);
+     * DriveBackLeft.set(percentOutput);
+     * DriveBackRight.set(percentOutput);
+     * Thread.sleep(driveTimeMs);
+     * 
+     * DriveFrontLeft.set(0);
+     * DriveFrontRight.set(0);
+     * DriveBackLeft.set(0);
+     * DriveBackRight.set(0);
+     * 
+     * Thread.sleep(100);
+     * 
+     * System.out.println("Autonomous: starting shooter and feed");
+     * MotorShooterLeft.set(shooterOutput);
+     * MotorShooterRight.set(shooterOutput);
+     * MotorFeed.set(feedOutput);
+     * MotorColumn.set(columnOutput);
+     * 
+     * Thread.sleep(shootTimeMs);
+     * 
+     * MotorShooterLeft.set(0);
+     * MotorShooterRight.set(0);
+     * MotorFeed.set(0);
+     * MotorColumn.set(0);
+     * 
+     * System.out.println("Autonomous: complete");
+     * } catch (InterruptedException ex) {
+     * DriveFrontLeft.set(0);
+     * DriveFrontRight.set(0);
+     * DriveBackLeft.set(0);
+     * DriveBackRight.set(0);
+     * MotorShooterLeft.set(0);
+     * MotorShooterRight.set(0);
+     * MotorFeed.set(0);
+     * MotorColumn.set(0);
+     * Thread.currentThread().interrupt();
+     * }
+     * });
+     * autoThread.setDaemon(true);
+     * autoThread.setName("AutonomousThread");
+     * autoThread.start();
+     */
+  }
 
-    final double distanceMeters = 2.0; // desired backward travel
-    final double percentOutput = -0.5; // negative => backward
-    final double assumedMaxSpeedMps = 3.0; // estimate of robot speed at 100% output (adjust if needed)
-    final double actualSpeedMps = assumedMaxSpeedMps * Math.abs(percentOutput);
-    final long driveTimeMs = (long) (1000.0 * (distanceMeters / Math.max(actualSpeedMps, 0.01)));
+  @Override
+  public void autonomousPeriodic() {
+  }
 
-    // Shooting parameters
-    final double shooterOutput = MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM; // use medium speed
-    final double feedOutput = MOTOR_FEED_DEFAULT_SPEED;
-    final double columnOutput = MOTOR_COLUMN_DEFAULT_SPEED;
-    final long shootTimeMs = 3000; // shoot for 3s
+  @Override
+  public void autonomousExit() {
+  }
 
-    Thread autoThread = new Thread(() -> {
-      try {
-        System.out.println("Autonomous: driving backward for ~" + driveTimeMs + " ms");
-        DriveFrontLeft.set(percentOutput);
-        DriveFrontRight.set(percentOutput);
-        DriveBackLeft.set(percentOutput);
-        DriveBackRight.set(percentOutput);
-        Thread.sleep(driveTimeMs);
-
-        DriveFrontLeft.set(0);
-        DriveFrontRight.set(0);
-        DriveBackLeft.set(0);
-        DriveBackRight.set(0);
-
-        Thread.sleep(100);
-
-        System.out.println("Autonomous: starting shooter and feed");
-        MotorShooterLeft.set(shooterOutput);
-        MotorShooterRight.set(shooterOutput);
-        MotorFeed.set(feedOutput);
-        MotorColumn.set(columnOutput);
-
-        Thread.sleep(shootTimeMs);
-
-        MotorShooterLeft.set(0);
-        MotorShooterRight.set(0);
-        MotorFeed.set(0);
-        MotorColumn.set(0);
-
-        System.out.println("Autonomous: complete");
-      } catch (InterruptedException ex) {
-        DriveFrontLeft.set(0);
-        DriveFrontRight.set(0);
-        DriveBackLeft.set(0);
-        DriveBackRight.set(0);
-        MotorShooterLeft.set(0);
-        MotorShooterRight.set(0);
-        MotorFeed.set(0);
-        MotorColumn.set(0);
-        Thread.currentThread().interrupt();
-      }
-    });
-    autoThread.setDaemon(true);
-    autoThread.setName("AutonomousThread");
-    autoThread.start(); */
+  @Override
+  public void teleopInit() {
+    if (m_autonomousCommand != null) {
+      CommandScheduler.getInstance().cancel(m_autonomousCommand);
     }
 
-    @Override
-    public void autonomousPeriodic() {}
+  }
 
-    @Override
-    public void autonomousExit() {}
-
-    @Override
-    public void teleopInit() {
-        if (m_autonomousCommand != null) {
-            CommandScheduler.getInstance().cancel(m_autonomousCommand);
-        }
-        
-        
-    }
   boolean isIntakeMotorOn = false;
-    @Override
-    public void teleopPeriodic() {
-    
-      if (mControllerShooter.getLeftBumperButton()) {
-        MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
-      } else {
-        MotorIntakeCollect.set(0);
-      }
-        
-   
-      if (mControllerShooter.getRightBumperButton()) {
-        MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED);
-        MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED);
-        System.out.println("Right Bumper Pressed, : ");
-      } else {
-        MotorFeed.set(0);
-        MotorColumn.set(0);
-      }
-        //Calibration+=CALIBRATION_INCREMENT;
-        //System.out.println("+Calibration: " + Calibration);
-      
-    
-      
-    if (isIntakeMotorOn) { 
-      MotorIntakeCollect.set(MOTOR_INTAKE_SPIN_DEFAULT_SPEED+Calibration);
-    }
-    else {
-      MotorIntakeCollect.set(0);
-    }
-    
-    /*if (mControllerShooter.getPOV()==DPAD_UP) { 
-      System.out.println("DPADUP, turn on FEED Motor");
-      MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration);
-    }
-    else {
-      MotorFeed.set(0);
-    }
-    
-    if (mControllerShooter.getPOV()==DPAD_DOWN) { 
-      System.out.println("DPAD DOWN, turn off FEED Motor");
-      MotorFeed.set(0);
-    }
-    if (mControllerShooter.getPOV()==DPAD_UP) { 
-      
-    } */
 
-    /*if (mControllerShooter.getPOV()==DPAD_LEFT) { 
-      System.out.println("DPAD LEFT, turn off COLUMN Motor");
+  @Override
+  public void teleopPeriodic() {
+    // make the bumper control the intake toggle
+
+    if (mControllerShooter.getLeftBumperButton() && !pivotUp) {
+      MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
+    } else {
+      MotorIntakeCollect.set(.0);
+    }
+
+    if (mControllerShooter.getRightBumperButton()) {
+      MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED);
+      MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED);
+      System.out.println("Right Bumper Pressed, : ");
+    } else {
+      MotorFeed.set(0);
       MotorColumn.set(0);
     }
-    if (mControllerShooter.getPOV()==DPAD_RIGHT) { 
-      System.out.println("DPAD UP, turn on Column Motor");
-      MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED+Calibration);
-    } */
+    // Calibration+=CALIBRATION_INCREMENT;
+    // System.out.println("+Calibration: " + Calibration);
+
+    /*if (isIntakeMotorOn) {
+      MotorIntakeCollect.set(MOTOR_INTAKE_SPIN_DEFAULT_SPEED + Calibration);
+    } else {
+      MotorIntakeCollect.set(0);
+    }*/
+
+    /*
+     * if (mControllerShooter.getPOV()==DPAD_UP) {
+     * System.out.println("DPADUP, turn on FEED Motor");
+     * MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration);
+     * }
+     * else {
+     * MotorFeed.set(0);
+     * }
+     * 
+     * if (mControllerShooter.getPOV()==DPAD_DOWN) {
+     * System.out.println("DPAD DOWN, turn off FEED Motor");
+     * MotorFeed.set(0);
+     * }
+     * if (mControllerShooter.getPOV()==DPAD_UP) {
+     * 
+     * }
+     */
+
+    /*
+     * if (mControllerShooter.getPOV()==DPAD_LEFT) {
+     * System.out.println("DPAD LEFT, turn off COLUMN Motor");
+     * MotorColumn.set(0);
+     * }
+     * if (mControllerShooter.getPOV()==DPAD_RIGHT) {
+     * System.out.println("DPAD UP, turn on Column Motor");
+     * MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED+Calibration);
+     * }
+     */
 
     if (mControllerShooter.getXButton()) {// set shooter speed to 0
-      ShooterSpeed=0;
-      MotorIntakeCollect.set(ShooterSpeed);
-      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
+      ShooterSpeed = 0;
+      //MotorIntakeCollect.set(ShooterSpeed);
+      System.out.println("MotorIntakeSpin: " + ShooterSpeed);
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
-      //MotorColumn.set(ShooterSpeed);
-      //MotorFeed.set(FeedSpeed);
+      // MotorColumn.set(ShooterSpeed);
+      // MotorFeed.set(FeedSpeed);
     }
 
-   
     if (mControllerShooter.getYButton()) {// set Shooter Speed to low
-      
-      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_LOW-Calibration; //Calibration is negative because we set the shooter speed for low as negative
+      ShooterSpeed = MOTOR_SHOOTER_DEFAULT_SPEED_LOW - Calibration; // Calibration is negative because we set the
+                                                                    // shooter speed for low as negative
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
-      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
-      
-      //MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration); //Changed MotorFeed.set to MOTOR_FEED_DEFAULT_SPEED
-      //MotorFeed.set(FeedSpeed);
-    } 
+      //MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
+      System.out.println("MotorIntakeSpin: " + ShooterSpeed);
 
-
-     if (mControllerShooter.getBButton()) {// set Shooter Speed to Medium
-      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM-Calibration;
-      MotorShooterLeft.set(ShooterSpeed);
-      MotorShooterRight.set(ShooterSpeed);
-      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
-     }
-     {
-      //MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration); //Changed MotorFeed.set to MOTOR_FEED_DEFAULT_SPEED
-      //MotorFeed.set(FeedSpeed);
-    }
-     if (mControllerShooter.getAButton()) {// set Shooter Speed to High
-      ShooterSpeed=MOTOR_SHOOTER_DEFAULT_SPEED_HIGH-Calibration;
-      MotorShooterLeft.set(ShooterSpeed);
-      MotorShooterRight.set(ShooterSpeed);
-      System.out.println("MotorIntakeSpin: "+ ShooterSpeed);
-
-      //MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
-      //MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration); //Changed MotorFeed.set to MOTOR_FEED_DEFAULT_SPEED
+      // MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration); //Changed MotorFeed.set
+      // to MOTOR_FEED_DEFAULT_SPEED
+      // MotorFeed.set(FeedSpeed);
     }
 
-    // DOWN 
-if (mControllerShooter.getPOV() == DPAD_DOWN  && MotorIntakePivot.getPosition().getValueAsDouble() > MOTOR_INTAKE_PIVOT_DOWN_POSITION)
-  { //Set pivot arm to DOWN
-  if(IS_USING_PIVOT_HACK)//This code is only run if the pivot motor hack is being used
-    MotorIntakePivot.set(-(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration)); //Changed MotorFeed.set into MotorIntakePivot.set
-  else
-    MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_DOWN_POSITION + Calibration));
+    if (mControllerShooter.getBButton()) {// set Shooter Speed to Medium
+      ShooterSpeed = MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM - Calibration;
+      MotorShooterLeft.set(ShooterSpeed);
+      MotorShooterRight.set(ShooterSpeed);
+      //MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
+      System.out.println("MotorIntakeSpin: " + ShooterSpeed);
+    }
+    {
+      // MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration); //Changed MotorFeed.set
+      // to MOTOR_FEED_DEFAULT_SPEED
+      // MotorFeed.set(FeedSpeed);
+    }
+    if (mControllerShooter.getAButton()) {// set Shooter Speed to High
+      ShooterSpeed = MOTOR_SHOOTER_DEFAULT_SPEED_HIGH - Calibration;
+      MotorShooterLeft.set(ShooterSpeed);
+      MotorShooterRight.set(ShooterSpeed);
+      //MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
+      System.out.println("MotorIntakeSpin: " + ShooterSpeed);
+
+      // MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED-Calibration);
+      // MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED+Calibration); //Changed MotorFeed.set
+      // to MOTOR_FEED_DEFAULT_SPEED
+    }
+
+    double pivotPower = 0;
+    if (mControllerShooter.getPOV() == DPAD_DOWN) {
+      pivotPower = MOTOR_INTAKE_PIVOT_DOWN_SPEED;
+      pivotUp = false;
+    } else if (mControllerShooter.getPOV() == DPAD_UP) {
+      pivotPower = MOTOR_INTAKE_PIVOT_UP_SPEED;
+      pivotUp = true;
+    } else if (pivotUp) {
+      pivotPower = MOTOR_INTAKE_PIVOT_UP_MAINTENANCE_SPEED;
+    } else {
+      pivotPower = MOTOR_INTAKE_PIVOT_DOWN_MAINTENANCE_SPEED;
+    }
+    MotorIntakePivot.set(pivotPower);
+    
+
+    // DOWN
+    /*if (mControllerShooter.getPOV() == DPAD_DOWN
+        && MotorIntakePivot.getPosition().getValueAsDouble() > MOTOR_INTAKE_PIVOT_DOWN_POSITION) { // Set pivot arm to
+                                                                                                   // DOWN
+      if (IS_USING_PIVOT_HACK)// This code is only run if the pivot motor hack is being used
+        MotorIntakePivot.set(-(MOTOR_INTAKE_PIVOT_SPEED_HACK + Calibration)); // Changed MotorFeed.set into
+                                                                              // MotorIntakePivot.set
+      else
+        MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_DOWN_POSITION + Calibration));
+    }
+    // UP
+    if (mControllerShooter.getPOV() == DPAD_UP
+        && MotorIntakePivot.getPosition().getValueAsDouble() < MOTOR_INTAKE_PIVOT_UP_POSITION) // Should allow the
+    { // Set pivot arm to UP
+      if (IS_USING_PIVOT_HACK) // This code is only run if the pivot motor hack is being used
+        MotorIntakePivot.set(MOTOR_INTAKE_PIVOT_SPEED_HACK + Calibration); // Changed MotorFeed.set into
+                                                                           // MotorIntakePivot.set
+      else // This code is run if not hacking the pivot motor
+        MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_UP_POSITION + Calibration));
+    }*/
   }
-// UP 
-if (mControllerShooter.getPOV() == DPAD_UP && MotorIntakePivot.getPosition().getValueAsDouble() < MOTOR_INTAKE_PIVOT_UP_POSITION) //Should allow the 
-  { //Set pivot arm to UP
-  if(IS_USING_PIVOT_HACK) //This code is only run if the pivot motor hack is being used
-    MotorIntakePivot.set(MOTOR_INTAKE_PIVOT_SPEED_HACK+Calibration); //Changed MotorFeed.set into MotorIntakePivot.set
-  else // This code is run if not hacking the pivot motor
-    MotorIntakePivot.setControl(new MotionMagicDutyCycle(MOTOR_INTAKE_PIVOT_UP_POSITION + Calibration) );
+
+  @Override
+  public void teleopExit() {
   }
-}
 
-    @Override
-    public void teleopExit() {}
+  @Override
+  public void testInit() {
+    CommandScheduler.getInstance().cancelAll();
+  }
 
-    @Override
-    public void testInit() {
-        CommandScheduler.getInstance().cancelAll();
-    }
+  @Override
+  public void testPeriodic() {
+  }
 
-    @Override
-    public void testPeriodic() {}
+  @Override
+  public void testExit() {
+  }
 
-    @Override
-    public void testExit() {}
-
-    @Override
-    public void simulationPeriodic() {}
+  @Override
+  public void simulationPeriodic() {
+  }
 }
