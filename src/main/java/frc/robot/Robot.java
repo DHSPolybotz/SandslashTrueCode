@@ -6,16 +6,21 @@ package frc.robot;
 
 import com.ctre.phoenix6.HootAutoReplay;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+import com.ctre.phoenix6.swerve.SwerveRequest;
 import com.ctre.phoenix6.configs.TalonFXConfiguration; //motion magic
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
 import com.ctre.phoenix6.configs.FeedbackConfigs;
@@ -142,7 +147,7 @@ public class Robot extends TimedRobot {
       .withJoystickReplay();
 
   public Robot() {
-    m_robotContainer = new RobotContainer();
+    m_robotContainer = new RobotContainer(MotorFeed, MotorColumn, MotorIntakeCollect, MotorIntakePivot, MotorShooterLeft, MotorShooterRight); //added the motors in the parenthesis 4/1/2026
 
     TalonFXConfiguration config = new TalonFXConfiguration();
     // PID (We might need to tune these values later, but for now we keep kP to 3
@@ -164,9 +169,9 @@ public class Robot extends TimedRobot {
     MotorIntakePivot.setNeutralMode(NeutralModeValue.Brake);
 
     CurrentLimitsConfigs driveCurrentLimit = new CurrentLimitsConfigs();
-    driveCurrentLimit.StatorCurrentLimit = 120;
+    driveCurrentLimit.StatorCurrentLimit = 80;
     driveCurrentLimit.StatorCurrentLimitEnable = true;
-    driveCurrentLimit.SupplyCurrentLimit = 70;
+    driveCurrentLimit.SupplyCurrentLimit = 60;
     driveCurrentLimit.SupplyCurrentLimitEnable = true;
 
     DriveBackLeft.getConfigurator().apply(driveCurrentLimit);
@@ -197,7 +202,7 @@ public class Robot extends TimedRobot {
     MotorColumn.getConfigurator().apply(columnCurrentlimits);
 
     CurrentLimitsConfigs ShooterCurrentlimits = new CurrentLimitsConfigs();
-    ShooterCurrentlimits.StatorCurrentLimit = 120;
+    ShooterCurrentlimits.StatorCurrentLimit = 70;
     ShooterCurrentlimits.StatorCurrentLimitEnable = true;
     ShooterCurrentlimits.SupplyCurrentLimit = 60;
     ShooterCurrentlimits.SupplyCurrentLimitEnable = true;
@@ -313,6 +318,13 @@ public class Robot extends TimedRobot {
 
   @Override
   public void autonomousPeriodic() {
+    // Schedule the autonomous command provided by RobotContainer (avoids undefined 'drivetrain' and 'drive')
+    if (m_autonomousCommand == null) {
+      m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+      if (m_autonomousCommand != null) {
+        m_autonomousCommand.schedule();
+      }
+    }
   }
 
   @Override
