@@ -232,6 +232,19 @@ public class Robot extends TimedRobot {
   public void robotPeriodic() {
     m_timeAndJoystickReplay.update();
     CommandScheduler.getInstance().run();
+    
+    // Log all motor outputs to SmartDashboard for simulator visualization
+    Telemetry telemetry = m_robotContainer.getTelemetry();
+    if (telemetry != null) {
+      telemetry.updateMotorTelemetry(
+          MotorShooterLeft.get(),
+          MotorShooterRight.get(),
+          MotorFeed.get(),
+          MotorColumn.get(),
+          MotorIntakeCollect.get(),
+          MotorIntakePivot.get()
+      );
+    }
   }
 
   @Override
