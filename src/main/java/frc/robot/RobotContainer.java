@@ -1,21 +1,15 @@
 // Copyright (c) FIRST and other WPILib contributors. 
-
 // Open Source Software; you can modify and/or share it under the terms of 
-
 // the WPILib BSD license file in the root directory of this project. 
 
  
-
 package frc.robot; 
-
  
 
 import static edu.wpi.first.units.Units.*; 
-
  
 
 import java.util.List; 
-
  
 
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType; 
@@ -160,7 +154,28 @@ public class RobotContainer {
                 // Briefly set the drivetrain to idle so this step finishes and the sequence can continue
                 drivetrain.applyRequest(() -> idle).withTimeout(0.1), // Stop my drivetrain from moving after the previous command ends.
 
-                new RunCommand(() -> { 
+                new InstantCommand(() -> { 
+                    MotorShooterLeft.set(-0.85); 
+                    MotorShooterRight.set(-0.85); 
+                }),
+                Commands.waitSeconds(1.0),
+
+                //Feeder and Column for 16 seconds, rest of auto
+                new InstantCommand(() -> {
+                    MotorFeed.set(0.5); 
+                    MotorColumn.set(-0.5);
+                }),
+                Commands.waitSeconds(16),
+
+                // Stop everything
+                new InstantCommand(() -> {
+                MotorFeed.set(0);
+                MotorColumn.set(0);
+                MotorShooterLeft.set(0);
+                MotorShooterRight.set(0);
+                })
+
+                /*new RunCommand(() -> { 
                     MotorShooterLeft.set(-0.85); 
                     MotorShooterRight.set(-0.85); 
                 }).withTimeout(1.0), // Run the shooter for 1 second initially and do not stop 
@@ -175,7 +190,7 @@ public class RobotContainer {
                     MotorColumn.set(0); 
                     MotorShooterLeft.set(0); 
                     MotorShooterRight.set(0); 
-                })  // Stops all gamepiece handling motors 
+                })*/  // Stops all gamepiece handling motors 
         ); 
         return backUpCommand; 
     } 
