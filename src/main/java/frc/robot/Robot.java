@@ -74,10 +74,10 @@ public class Robot extends TimedRobot {
   public static final double MOTOR_INTAKE_SPIN_DEFAULT_SPEED = 0.2;
   public static final double MOTOR_FEED_DEFAULT_SPEED = 0.5;
   public static final double MOTOR_COLUMN_DEFAULT_SPEED = -0.5;
-  public static final double MOTOR_INTAKE_COLLECT_DEFAULT_SPEED = .85;
+  public static final double MOTOR_INTAKE_COLLECT_DEFAULT_SPEED = .80; 
   public static final double MOTOR_SHOOTER_DEFAULT_SPEED_LOW = -.70;
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.85;
-  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = -1;
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_MEDIUM = -0.75;
+  public static final double MOTOR_SHOOTER_DEFAULT_SPEED_HIGH = -.80;
   public static final double MOTOR_INTAKE_PIVOT_DOWN_POSITION = -0.1; // 0.05 rotations, multiplied by 25 to convert to
                                                                       // real rotation of motor
   public static final double MOTOR_INTAKE_PIVOT_UP_POSITION = 0.5; // 0.05 rotations, multiplied by 25 to convert to
@@ -365,7 +365,7 @@ public class Robot extends TimedRobot {
     }
 
     if (mControllerShooter.getRightBumperButton()) {
-      MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED);
+      //MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED);
       MotorColumn.set(MOTOR_COLUMN_DEFAULT_SPEED);
       System.out.println("Right Bumper Pressed, : ");
     } else {
@@ -425,6 +425,7 @@ public class Robot extends TimedRobot {
                                                                     // shooter speed for low as negative
       MotorShooterLeft.set(ShooterSpeed);
       MotorShooterRight.set(ShooterSpeed);
+      MotorFeed.set(MOTOR_FEED_DEFAULT_SPEED); //Button "Y" turns on Feed Motor
       //MotorIntakeCollect.set(MOTOR_INTAKE_COLLECT_DEFAULT_SPEED);
       System.out.println("MotorIntakeSpin: " + ShooterSpeed);
 
