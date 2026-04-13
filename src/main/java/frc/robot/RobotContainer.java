@@ -150,13 +150,18 @@ public class RobotContainer {
                 drivetrain.runOnce(() -> drivetrain.seedFieldCentric(Rotation2d.kZero)), // Reseting your field orientation 
 
                 drivetrain.applyRequest(() -> drive.withVelocityX(-0.5).withVelocityY(0).withRotationalRate(0)) // Create your drive command 
-                        .withTimeout(3.0), // End my drive command after 3 seconds 
+                        .withTimeout(.5), // End my drive command after 3 seconds 
                 // Briefly set the drivetrain to idle so this step finishes and the sequence can continue
-                drivetrain.applyRequest(() -> idle).withTimeout(0.1), // Stop my drivetrain from moving after the previous command ends.
+                drivetrain.applyRequest(() -> idle).withTimeout(2.5), // Stop my drivetrain from moving after the previous command ends.
+
+                /*new InstantCommand(() -> {
+                    MotorIntakePivot.set(0.5); // Move the intake pivot down to the ground 
+                }),
+                Commands.waitSeconds(0.2), // Wait for the intake pivot to move down*/
 
                 new InstantCommand(() -> { 
-                    MotorShooterLeft.set(-0.85); 
-                    MotorShooterRight.set(-0.85); 
+                    MotorShooterLeft.set(-0.80); 
+                    MotorShooterRight.set(-0.80); 
                 }),
                 Commands.waitSeconds(1.0),
 
@@ -165,7 +170,7 @@ public class RobotContainer {
                     MotorFeed.set(0.5); 
                     MotorColumn.set(-0.5);
                 }),
-                Commands.waitSeconds(16),
+                Commands.waitSeconds(5),
 
                 // Stop everything
                 new InstantCommand(() -> {
